@@ -59,8 +59,7 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
 
             GetImage(
                 imageList[position].post_url.plus("/download"),
-                imageList[position].filename.toString(),
-                p0.itemView.findViewById<ProgressBar>(R.id.progressBar)
+                imageList[position].filename.toString()
             ).execute()
         }
 
@@ -166,17 +165,14 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
         private var imageUrl: String = ""
         private var fileName: String = ""
         private var bitmap: Bitmap? = null
-        private var progressBar:ProgressBar? = null
 
 
         constructor(
             imageUrl: String,
-            fileName: String,
-            progressBar: ProgressBar
+            fileName: String
         ) {
             this.imageUrl = imageUrl
             this.fileName = fileName
-            this.progressBar = progressBar
 
         }
 
@@ -193,6 +189,7 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
             mBuilder?.setProgress(25,values[0]?:0,false)
             mNotifyManager?.notify(id,mBuilder?.setContentTitle(fileName)?.build())
 
+
             super.onProgressUpdate(*values)
 
         }
@@ -206,8 +203,7 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
                 for (i in 0..25)
                 {
                     publishProgress(minOf(i,25))
-                    runOnUiThread { progressBar?.progress = i
-                    }
+
                 }
 
 
