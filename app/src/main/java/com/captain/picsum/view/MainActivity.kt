@@ -1,15 +1,23 @@
 package com.captain.picsum.view
 
+import android.Manifest
+import android.app.NotificationManager
+import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.AsyncTask
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
 import android.view.View
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
 import com.captain.picsum.R
@@ -22,9 +30,13 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
 
+import androidx.core.app.NotificationCompat
+import kotlinx.android.synthetic.main.recycler_single_layout.*
 
 
 class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
+
+
     override fun onBindViewHolder(p0: ImageRecyclerAdapter.viewHolder, position: Int) {
 
         if (imageList.isNotEmpty()) {
@@ -33,6 +45,13 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
 
         p0.itemView.findViewById<ImageView>(R.id.download_image).setOnClickListener {
 
+            mNotifyManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager?
+
+            mBuilder = NotificationCompat.Builder(this)
+
+            mBuilder?.setContentTitle("Downloading ${p0.itemView.findViewById<TextView>(R.id.filename).text}")
+                ?.setContentText("Download in Progress")
+                ?.setSmallIcon(R.drawable.ic_file_download_black_24dp)
             Log.i(
                 "Download",
                 imageList[position].post_url + "/download" + " " + imageList[position].filename.toString()
@@ -40,7 +59,8 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
 
             GetImage(
                 imageList[position].post_url.plus("/download"),
-                imageList[position].filename.toString()
+                imageList[position].filename.toString(),
+                p0.itemView.findViewById<ProgressBar>(R.id.progressBar)
             ).execute()
         }
 
@@ -79,9 +99,16 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
 
     private var imageList: List<ImagesResponseModel> = arrayListOf()
 
+    private var mNotifyManager: NotificationManager? = null
+
+    private var mBuilder: NotificationCompat.Builder? = null
+
+    private val id = 1
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(com.captain.picsum.R.layout.activity_main)
 
 
         viewModel.getAllImages().observe(this, Observer {
@@ -100,40 +127,108 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
         images_recyclerView.adapter = mAdapter
         viewModel.getImagesFromNetwork()
 
+        if (Build.VERSION.SDK_INT >= 23) {
+
+            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                Log.v("TAG","Permission is granted");
+            }
+            else
+            {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1);
+
+            }
+
+
+        }
+
 
     }
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
-    inner class GetImage : AsyncTask<Any, Any, Any> {
+        if(grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+            Log.v("TAG","Permission: "+permissions[0]+ "was "+grantResults[0]);
+        }
+        else
+        {
+            Toast.makeText(this,"Permission Required to save Image",Toast.LENGTH_LONG).show()
+        }
+    }
+
+
+    inner class GetImage : AsyncTask<Int, Int, Any> {
 
         private var imageUrl: String = ""
         private var fileName: String = ""
         private var bitmap: Bitmap? = null
+        private var progressBar:ProgressBar? = null
 
 
-        constructor(imageUrl: String, fileName: String) {
+        constructor(
+            imageUrl: String,
+            fileName: String,
+            progressBar: ProgressBar
+        ) {
             this.imageUrl = imageUrl
             this.fileName = fileName
+            this.progressBar = progressBar
 
         }
 
-        override fun doInBackground(vararg p0: Any?) {
+        override fun onPreExecute() {
+            super.onPreExecute()
+
+            mBuilder?.setProgress(25,0,false)
+            mNotifyManager?.notify(id,mBuilder?.setContentTitle(fileName)?.build())
+
+        }
+
+        override fun onProgressUpdate(vararg values: Int?) {
+
+            mBuilder?.setProgress(25,values[0]?:0,false)
+            mNotifyManager?.notify(id,mBuilder?.setContentTitle(fileName)?.build())
+
+            super.onProgressUpdate(*values)
+
+        }
+        override fun doInBackground(vararg p0: Int?): Any? {
 
             try {
                 val imageUrl = URL(imageUrl)
                 val conn = imageUrl.openConnection()
-                 bitmap = BitmapFactory.decodeStream(conn.getInputStream())
+                bitmap = BitmapFactory.decodeStream(conn.getInputStream())
+                //Log.i("Progress" , )
+                for (i in 0..25)
+                {
+                    publishProgress(minOf(i,25))
+                    runOnUiThread { progressBar?.progress = i
+                    }
+                }
+
 
             } catch (e: Exception) {
                 e.stackTrace
             }
+            return null
 
         }
+
+
 
         override fun onPostExecute(result: Any?) {
             super.onPostExecute(result)
 
             saveImage(bitmap)
+            mBuilder?.setContentText("Download Complete")
+            mBuilder?.setProgress(0,0,false)
+            mNotifyManager?.notify(id,mBuilder?.setContentTitle(fileName)?.build())
+
+
 
         }
 
