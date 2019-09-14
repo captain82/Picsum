@@ -1,8 +1,11 @@
 package com.captain.picsum.view
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
 import android.widget.ImageView
 import android.widget.TextView
@@ -17,20 +20,30 @@ import kotlinx.android.synthetic.main.activity_main.*
 import org.jetbrains.anko.doAsync
 import org.jetbrains.anko.sdk27.coroutines.onClick
 import org.jetbrains.anko.toast
+import java.io.File
+import java.io.FileOutputStream
+import java.net.URL
 
-class MainActivity : AppCompatActivity(),Callback.onBindviewHolderCallback {
+
+
+class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
     override fun onBindViewHolder(p0: ImageRecyclerAdapter.viewHolder, position: Int) {
 
-        if (imageList.isNotEmpty())
-        {
-            p0.itemView.findViewById<TextView>(R.id.filename).text =imageList[position].filename
+        if (imageList.isNotEmpty()) {
+            p0.itemView.findViewById<TextView>(R.id.filename).text = imageList[position].filename
         }
 
         p0.itemView.findViewById<ImageView>(R.id.download_image).setOnClickListener {
 
-            Log.i("Download" , imageList[position].post_url+"/download"+" "+imageList[position].filename.toString())
+            Log.i(
+                "Download",
+                imageList[position].post_url + "/download" + " " + imageList[position].filename.toString()
+            )
 
-            GetImage(imageList[position].post_url.plus("/download"),imageList[position].filename.toString())
+            GetImage(
+                imageList[position].post_url.plus("/download"),
+                imageList[position].filename.toString()
+            ).execute()
         }
 
     }
@@ -39,7 +52,7 @@ class MainActivity : AppCompatActivity(),Callback.onBindviewHolderCallback {
 
     private val mAdapter by lazy { ImageRecyclerAdapter(this) }
 
-    private var imageList:List<ImagesResponseModel> = arrayListOf()
+    private var imageList: List<ImagesResponseModel> = arrayListOf()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,14 +61,12 @@ class MainActivity : AppCompatActivity(),Callback.onBindviewHolderCallback {
 
         viewModel.getAllImages().observe(this, Observer {
 
-            if (it!=null && !it.isEmpty()) {
+            if (it != null && !it.isEmpty()) {
 
                 toast(it[0].filename.toString())
                 imageList = it
                 mAdapter.showAllImages(imageList.take(20))
-            }
-            else
-            {
+            } else {
                 imageList = arrayListOf()
                 mAdapter.showAllImages(imageList)
             }
@@ -68,15 +79,14 @@ class MainActivity : AppCompatActivity(),Callback.onBindviewHolderCallback {
     }
 
 
+    inner class GetImage : AsyncTask<Any, Any, Any> {
 
-    inner class GetImage:AsyncTask<Any,Any,Any>
-    {
+        private var imageUrl: String = ""
+        private var fileName: String = ""
+        private var bitmap: Bitmap? = null
 
-        private var imageUrl:String = ""
-        private var fileName:String = ""
 
-         constructor( imageUrl:String,fileName:String)
-        {
+        constructor(imageUrl: String, fileName: String) {
             this.imageUrl = imageUrl
             this.fileName = fileName
 
@@ -84,11 +94,44 @@ class MainActivity : AppCompatActivity(),Callback.onBindviewHolderCallback {
 
         override fun doInBackground(vararg p0: Any?) {
 
-            Log.i("Download" , imageUrl.plus("").plus(fileName))
+            try {
+                val imageUrl = URL(imageUrl)
+                val conn = imageUrl.openConnection()
+                 bitmap = BitmapFactory.decodeStream(conn.getInputStream())
 
+            } catch (e: Exception) {
+                e.stackTrace
+            }
 
         }
 
+        override fun onPostExecute(result: Any?) {
+            super.onPostExecute(result)
+
+            saveImage(bitmap)
+
+        }
+
+        private fun saveImage(bitmap: Bitmap?) {
+            val root = Environment.getExternalStorageDirectory()
+            Log.i("Path" , root.absolutePath.toString())
+            val picDir = File(root.absolutePath +"/picsum")
+            picDir.mkdirs()
+           val  file = File(picDir.absoluteFile,fileName)
+
+            try {
+                val out = FileOutputStream(file)
+                bitmap?.compress(Bitmap.CompressFormat.JPEG,90,out)
+                out.flush()
+                out.close()
+            }catch (e:Exception)
+            {
+                e.printStackTrace()
+            }
+
+
+
+        }
 
 
     }
