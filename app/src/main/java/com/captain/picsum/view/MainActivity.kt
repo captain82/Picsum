@@ -7,18 +7,16 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
+import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProviders
 import com.captain.picsum.R
 import com.captain.picsum.adapter.ImageRecyclerAdapter
 import com.captain.picsum.models.ImagesResponseModel
 import com.captain.picsum.viewModels.ImagesViewModel
 import kotlinx.android.synthetic.main.activity_main.*
-import org.jetbrains.anko.doAsync
-import org.jetbrains.anko.sdk27.coroutines.onClick
 import org.jetbrains.anko.toast
 import java.io.File
 import java.io.FileOutputStream
@@ -44,6 +42,33 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
                 imageList[position].post_url.plus("/download"),
                 imageList[position].filename.toString()
             ).execute()
+        }
+
+        val status = checkImageExist(imageList[position].filename,p0.itemView.findViewById<ImageView>(R.id.download_image))
+        if (status.equals(true))
+        {
+            //p0.itemView.findViewById<ImageView>(R.id.download_image) = View.INVISIBLE
+
+        }
+
+
+    }
+
+    private fun checkImageExist(filename: String?, itemView: View):Boolean {
+
+        val root = Environment.getExternalStorageDirectory()
+        Log.i("Path" , root.absolutePath.toString())
+        val picDir = File(root.absolutePath +"/Picsum/${filename}")
+        Log.i("Status" , filename+" "+picDir.exists())
+        return (picDir.exists()).also {
+            if (it)
+            {
+                itemView.visibility = View.GONE
+            }
+            else
+            {
+                itemView.visibility = View.VISIBLE
+            }
         }
 
     }
@@ -115,7 +140,7 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
         private fun saveImage(bitmap: Bitmap?) {
             val root = Environment.getExternalStorageDirectory()
             Log.i("Path" , root.absolutePath.toString())
-            val picDir = File(root.absolutePath +"/picsum")
+            val picDir = File(root.absolutePath +"/Picsum")
             picDir.mkdirs()
            val  file = File(picDir.absoluteFile,fileName)
 
@@ -124,6 +149,7 @@ class MainActivity : AppCompatActivity(), Callback.onBindviewHolderCallback {
                 bitmap?.compress(Bitmap.CompressFormat.JPEG,90,out)
                 out.flush()
                 out.close()
+                mAdapter.notifyDataSetChanged()
             }catch (e:Exception)
             {
                 e.printStackTrace()
